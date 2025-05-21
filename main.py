@@ -76,7 +76,7 @@ async def main():  # 将主逻辑包装成 async 函数
     }
 
     from graph_chat.draw_png import draw_graph
-    # draw_graph(graph, 'graph2.png')
+    draw_graph(graph, 'graph.png')
 
     # 生成随机的唯一会话id
     session_id = str(uuid.uuid4())
