@@ -58,6 +58,7 @@ class State(TypedDict):
             Literal[
                 "primary_assistant",
                 "environment_monitor",
+                "disease_pest",
             ]
         ],
         update_dialog_stack,
