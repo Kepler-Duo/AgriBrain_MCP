@@ -55,3 +55,5 @@ class ToDiseaseAndPestAssistant(BaseModel):
                 "request": "我想知道这个作物发生什么了,怎么防治?。",
             }
         }
+
+# TODO(wwc, 2025-05-21): 定义其他子助理的数据模型类

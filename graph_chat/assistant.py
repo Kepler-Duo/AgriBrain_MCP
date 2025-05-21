@@ -6,8 +6,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_openai import ChatOpenAI
 
-# from graph_chat.base_data_model import ToFlightBookingAssistant, ToBookCarRental, ToHotelBookingAssistant, \
-    # ToBookExcursion
 from graph_chat.base_data_model import ToEnvironmentMonitorAssistant, ToDiseaseAndPestAssistant
 from graph_chat.llm_tavily import tavily_tool, llm
 from graph_chat.state import State
@@ -74,6 +72,7 @@ assistant_runnable = primary_assistant_prompt | llm.bind_tools(
     [
         ToEnvironmentMonitorAssistant, # 用于环境监测的专门助理
         ToDiseaseAndPestAssistant, # 用于病虫害管理的专门助理
+        # TODO: 添加其他专门助理
     ]
 )
 

@@ -69,3 +69,5 @@ def _print_event(event: dict, _printed: set, max_length=1500):
                 msg_repr = msg_repr[:max_length] + " ... （已截断）"  # 超过最大长度则截断
             print(msg_repr)  # 输出消息的表示形式
             _printed.add(message.id)  # 将消息ID添加到已打印集合中
+            
+# TODO(wwc, 2025-05-21): 更改事件消息传递类型,最好是后端分离开以RESTFUL风格做

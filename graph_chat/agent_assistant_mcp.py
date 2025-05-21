@@ -64,6 +64,8 @@ disease_pest_prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(time=datetime.now())
 
+# TODO(wwc, 2025-05-21): 增添子助理的prompt
+
 # 私有变量用于缓存
 _initialized = False
 _cached_tools = []
@@ -96,11 +98,17 @@ async def get_tools() -> List[Union[str, object]]:
 
 
 async def get_environment_monitor_runnable() -> Runnable:
-    """获取已初始化的 Runnable 对象"""
+    """获取已初始化的环境监测 Runnable 对象"""
     await _initialize_once()
     return _cached_environment_runnable
 
 async def get_disease_pest_runnable() -> Runnable:
-    """获取已初始化的 Runnable 对象"""
+    """获取已初始化的病虫害管理 Runnable 对象"""
     await _initialize_once()
     return _cached_disease_runnable
+
+# TODO(wwc, 2025-05-21): 增添子助理的runnable
+
+async def get_crop_growth_runnable() -> Runnable:
+    """获取已初始化的作物生长监测 Runnable 对象"""
+    pass

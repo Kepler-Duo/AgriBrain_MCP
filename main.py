@@ -28,6 +28,7 @@ async def main():  # 将主逻辑包装成 async 函数
     # await 异步函数,适配mcp工具
     builder = await build_environment_monitor_graph(builder)
     builder = await build_disease_pest_graph(builder)
+    # TODO(wwc, 2025-05-21): 这里可以添加更多的子助手节点,确保是异步函数
 
     def route_primary_assistant(state: dict):
         """
@@ -44,9 +45,9 @@ async def main():  # 将主逻辑包装成 async 函数
         if tool_calls:
             print(f"tool_calls_name: {tool_calls[0]["name"]}")
             if tool_calls[0]["name"] == ToEnvironmentMonitorAssistant.__name__:
-                return "enter_environment_monitor"  # 跳转至技能节点
+                return "enter_environment_monitor"  # 跳转至环境监测技能节点
             if tool_calls[0]["name"] == ToDiseaseAndPestAssistant.__name__:
-                return "enter_disease_pest"  # 跳转至技能节点
+                return "enter_disease_pest"  # 跳转至病虫害管理技能节点
         raise ValueError("无效的路由")  # 如果没有找到合适的工具调用，抛出异常
 
     # 条件边：符合谁的条件就跳转到谁（取决于之前对话对state的更新）
@@ -56,6 +57,7 @@ async def main():  # 将主逻辑包装成 async 函数
         [
             "enter_environment_monitor",
             "enter_disease_pest",
+            # TODO(wwc, 2025-05-21): 这里可以添加更多的条件边,跳转自助理
             END,
         ]
     )
@@ -80,11 +82,11 @@ async def main():  # 将主逻辑包装成 async 函数
     session_id = str(uuid.uuid4())
     # update_dates()  # 每次测试的时候：保证数据库是全新的，保证，时间也是最近的时间
 
-    # 配置参数，包含乘客ID和线程ID
+    # 配置参数，包含用户ID和线程ID
     config = {
         "configurable": {
             # passenger_id用于我们的航班工具，以获取用户的航班信息
-            "passenger_id": "3442 587242",
+            "user_id": "3442 587242",
             # 检查点由session_id访问
             "thread_id": session_id,
         }
@@ -112,3 +114,5 @@ async def main():  # 将主逻辑包装成 async 函数
 
 if __name__ == "__main__":
     asyncio.run(main())  # 使用 asyncio 运行异步主函数
+    
+# TODO(wwc, 2025-05-21): 更改为后端形式，而非目前的命令行形式

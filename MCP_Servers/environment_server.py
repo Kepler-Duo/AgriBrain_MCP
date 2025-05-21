@@ -59,3 +59,5 @@ async def get_disease_pest_detection(img_path: str) -> str:
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
+    
+# TODO(wwc, 2025-05-21): 添加其他MCP工具,以及实现真实工具

@@ -6,33 +6,6 @@ from graph_chat.base_data_model import CompleteOrEscalate
 from graph_chat.llm_tavily import llm
 from tools.environment_tools import get_current_weather, get_soil_moisture
 
-
-# from tools.car_tools import search_car_rentals, book_car_rental, update_car_rental, cancel_car_rental
-# from tools.flights_tools import search_flights, update_ticket_to_new_flight, cancel_ticket
-# from tools.hotels_tools import search_hotels, book_hotel, update_hotel, cancel_hotel
-# from tools.trip_tools import search_trip_recommendations, book_excursion, update_excursion, cancel_excursion
-
-
-
-
-
-# from base_data_model import CompleteOrEscalate
-# from llm_tavily import llm
-# from langchain_core.tools import tool
-
-# @tool
-# def get_current_weather(location: str) -> str:
-#     """
-#     获取指定地点的当前气象信息。
-#     """
-#     return f"地点 {location} 的当前天气为：晴，温度 25°C，湿度 40%。"
-
-# @tool
-# def get_soil_moisture(field_id: str) -> str:
-#     """
-#     获取指定农田区域的土壤湿度。
-#     """
-#     return f"区域 {field_id} 的土壤湿度为 32%。"
   
 
 # 环境监测助理 Prompt
