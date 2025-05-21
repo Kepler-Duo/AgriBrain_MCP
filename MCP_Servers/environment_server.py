@@ -11,7 +11,7 @@ city_df = pd.read_excel(
 )
 
 # 高德天气 API URL 和 key
-AMAP_API_KEY = os.environ.get('AMAP_API_KEY', '97a315c02ae1eff1bb76a5ecec292323')
+AMAP_API_KEY = os.environ.get('AMAP_API_KEY', '')
 AMAP_API_URL = 'https://restapi.amap.com/v3/weather/weatherInfo?city={city}&key={key}'
 
 def get_city_adcode(city_name: str) -> str:
