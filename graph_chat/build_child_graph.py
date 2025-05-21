@@ -1,0 +1,171 @@
+from langgraph.graph import StateGraph
+# from graph_chat.agent_assistant import environment_monitor_runnable
+# from graph_chat.agent_assistant import tools
+from graph_chat.agent_assistant_mcp import get_environment_monitor_runnable, get_disease_pest_runnable, get_tools
+from graph_chat.assistant import AgriAssistant
+from graph_chat.entry_node import create_entry_node
+from tools.tools_handler import create_tool_node_with_fallback
+from langgraph.prebuilt import tools_condition
+from langgraph.constants import END
+from langchain_core.messages import ToolMessage
+from graph_chat.base_data_model import CompleteOrEscalate
+
+
+async def build_environment_monitor_graph(builder: StateGraph) -> StateGraph:
+    # 更新环境监测的入口节点 —— 一个过渡节点，在实际执行操作之前能更清晰地提示模型自己的身份与任务
+    # 注意，add_node 的参数是节点名与要执行的函数，但不是返回函数的实例而是返回函数本身，即不加括号！
+    # 之所以这里有括号且传了参数，是因为是一个闭包的写法，其内部返回的函数是函数对象本身！
+    # 这个闭包写法相当于：
+    # builder.add_node(
+    #     "enter_environment_monitor",
+    #     entry_node # 明面上的函数返回的真正函数，框架会自动传递state给它，它负责输出更新state的字典
+    #     而由于它被定义在外层函数里面，因此它可以接收外层函数接受的参数
+    #     之所以要用这种函数相互嵌套的闭包写法，是因为不同的助手节点创造的节点信息也是不同的
+    #     因此要把参数传给不同的助手，而add_node又规定其中的函数能且仅能以唯一的state作为输入，因此只能使用闭包
+    #     闭包达到的效果是，实际执行时传入的参数只有state，但传给外部函数的参数也可以被使用，达到了传入三个参数的效果
+    # )
+    builder.add_node(
+        "enter_environment_monitor",
+        create_entry_node("Environment Monitoring Assistant", "monitor_environment"),
+    )
+
+    
+    # 添加处理环境监测的实际节点
+    # 这里的 environment_monitor_runnable 是一个定义好的，绑定了工具（查询、预测、取消）并设好了提示词（告知模型自己负责环境监测）的模型
+    # 这里是 add_node 的类写法，即传参是不再是传入一个函数对象，而是传入一个类实例 —— 特别注意，函数不传实例传对象，类则传实例！
+    # 因此，AgriAssistant(environment_monitor_runnable)就是一个类实例，通过 __init__ 得到
+    # 在 Python 中，对于类 x，x()就得到了一个类实例，而这个过程会先调用默认的new方法，创建类实例，再调用init方法，给类的属性赋值
+    # 此时，这个类还应具有call方法，即能够被当成函数使用，其返回的也是关于state的更新
+    # builder.add_node("monitor_environment", AgriAssistant(environment_monitor_runnable))
+    environment_monitor_runnable = await get_environment_monitor_runnable()
+    builder.add_node(
+        "monitor_environment",
+        AgriAssistant(environment_monitor_runnable)
+    )
+    # 连接入口节点到实际处理节点（这样的边在绘图中体现为实线边，唯一且一定会执行）
+    builder.add_edge("enter_environment_monitor", "monitor_environment")
+
+    # 添加敏感工具和安全工具的节点
+    # 这里是add_node的另一种写法：既不是传递函数对象，也不是传递类实例，而是传递一个函数实例，这个函数实例返回了一个类实例
+    # 也就是说，这种写法间接地相当于传递了类实例
+    # 这个类实例实现的功能为，当发生错误时，返回对应的，要更新的state（在message中提示发生错误）
+    tools = await get_tools()
+    builder.add_node(
+        "environment_monitor_tools",
+        create_tool_node_with_fallback(tools),  # 敏感工具节点，包含可能修改数据的操作
+    )
+
+   
+    def route_update_monitor_environment(state: dict):
+        """
+        根据当前状态路由环境监控流程。
+
+        :param state: 当前对话状态字典
+        :return: 下一步应跳转到的节点名
+        """
+        # 获取最后一条消息
+        last_message = state["messages"][-1]
+        print(f"last_message: {last_message}")
+
+        # 如果最后一条消息没有工具调用，则跳转到 leave_skill
+        if not getattr(last_message, "tool_calls", None):
+            return "leave_skill"
+
+        # 否则跳转到工具处理节点
+        return "environment_monitor_tools"
+
+    # 添加边，连接敏感工具和安全工具节点回到航班更新处理节点
+    # builder.add_edge("update_flight_sensitive_tools", "update_flight")
+    # builder.add_edge("update_flight_safe_tools", "update_flight")
+    builder.add_edge("environment_monitor_tools", "monitor_environment")
+
+    # 根据条件路由更新流程
+    builder.add_conditional_edges(
+        "monitor_environment",
+        route_update_monitor_environment,
+        ["environment_monitor_tools", "leave_skill"], # 下一个可能的节点
+    )
+    # wwc
+
+    # 此节点将用于所有子助理的退出
+    def pop_dialog_state(state: dict) -> dict:
+        """
+        弹出对话栈并返回主助理。
+        这使得完整的图可以明确跟踪对话流，并根据需要委托控制给特定的子图。
+        :param state: 当前对话状态字典
+        :return: 包含新的对话状态和消息的字典
+        """
+        messages = []
+        # 如果上一条消息调用了工具，则将其基本信息送入message中，并对state进行更新
+        if state["messages"][-1].tool_calls:
+            # 注意：目前不处理LLM同时执行多个工具调用的情况
+            messages.append(
+                ToolMessage(
+                    content="正在恢复与主助理的对话。请回顾之前的对话并根据需要协助用户。",
+                    tool_call_id=state["messages"][-1].tool_calls[0]["id"],
+                )
+            )
+        return {
+            # 更新对话状态为弹出 —— 这里的 pop不是具体值，而是表示要弹出（被识别为一个“命令”）,因此不冲突
+            # 具体的值在state中定义，只能是那五个
+            "dialog_state": "pop",
+            "messages": messages,  # 返回消息列表
+        }
+
+    # 添加退出技能节点，并连接回主助理
+    builder.add_node("leave_skill", pop_dialog_state)
+    builder.add_edge("leave_skill", "primary_assistant")
+    return builder
+
+
+async def build_disease_pest_graph(builder: StateGraph) -> StateGraph:
+   
+    builder.add_node(
+        "enter_disease_pest",
+        create_entry_node("Disease and Pest Assistant", "disease_pest"),
+    )
+
+    disease_pest_runnable = await get_disease_pest_runnable()
+    builder.add_node(
+        "disease_pest",
+        AgriAssistant(disease_pest_runnable)
+    )
+    # 连接入口节点到实际处理节点（这样的边在绘图中体现为实线边，唯一且一定会执行）
+    builder.add_edge("enter_disease_pest", "disease_pest")
+
+    tools = await get_tools()
+    # print(tools)
+    builder.add_node(
+        "disease_pest_tools",
+        create_tool_node_with_fallback(tools),  # 敏感工具节点，包含可能修改数据的操作
+    )
+
+    def route_update_disease_pest(state: dict):
+        """
+        根据当前状态路由病虫害管理流程。
+
+        :param state: 当前对话状态字典
+        :return: 下一步应跳转到的节点名
+        """
+        # 获取最后一条消息
+        last_message = state["messages"][-1]
+        print(f"last_message: {last_message}")
+
+        # 如果最后一条消息没有工具调用，则跳转到 leave_skill
+        if not getattr(last_message, "tool_calls", None):
+            return "leave_skill"
+
+        # 否则跳转到工具处理节点
+        return "disease_pest_tools"
+
+    builder.add_edge("disease_pest_tools", "disease_pest")
+
+    # 根据条件路由更新流程
+    builder.add_conditional_edges(
+        "disease_pest",
+        route_update_disease_pest,
+        ["disease_pest_tools", "leave_skill"], # 下一个可能的节点
+    )
+
+   
+    return builder
